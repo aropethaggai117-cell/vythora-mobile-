@@ -1,0 +1,8 @@
+{
+  "appId": "com.vythora.ai",
+  "appName": "Vythora AI",
+  "webDir": "www",
+  "backgroundColor": "#050A14",
+  "android": { "allowMixedContent": false },
+  "plugins": { "SystemBars": { "insetsHandling": "css" } }
+}
