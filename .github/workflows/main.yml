@@ -1,0 +1,65 @@
+.github/workflows/build-apk.ymlname: Build Vythora AI APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Inject public Supabase config
+        env:
+          SB_URL: ${{ vars.SB_URL }}
+          SB_KEY: ${{ vars.SB_KEY }}
+        run: |
+          if [ -z "$SB_URL" ] || [ -z "$SB_KEY" ]; then
+            echo "::error::Add repository variables SB_URL and SB_KEY"
+            exit 1
+          fi
+          python3 - <<'PY'
+          import os
+          p='www/index.html'
+          t=open(p,encoding='utf-8').read()
+          t=t.replace('YOUR_SUPABASE_URL',os.environ['SB_URL'])
+          t=t.replace('YOUR_SUPABASE_ANON_KEY',os.environ['SB_KEY'])
+          open(p,'w',encoding='utf-8').write(t)
+          PY
+
+      - run: npm install
+
+      - name: Bundle Supabase client locally
+        run: |
+          mkdir -p www/vendor
+          cp node_modules/@supabase/supabase-js/dist/umd/supabase.js www/vendor/supabase.js
+
+      - run: pip install pillow
+      - run: python3 scripts/make_icons.py
+      - run: npx cap add android
+      - run: python3 scripts/patch_android.py
+      - run: npx capacitor-assets generate --android
+      - run: npx cap sync android
+
+      - name: Build debug APK
+        working-directory: android
+        run: chmod +x gradlew && ./gradlew assembleDebug
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vythora-ai-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
